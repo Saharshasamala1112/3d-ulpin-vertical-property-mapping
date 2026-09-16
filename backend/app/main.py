@@ -83,6 +83,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api", tags=["Health"])
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
+    @app.get("/api/health", tags=["Health"])
+    async def legacy_health_check():
+        return {"status": "ok", "service": "geosix-api"}
+
     @app.get("/api/v1", tags=["Root"])
     async def root():
         return {

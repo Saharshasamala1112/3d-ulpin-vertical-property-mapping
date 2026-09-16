@@ -6,12 +6,19 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+        "case_sensitive": False,
+    }
 
     # Application
     app_name: str = "GEOSIX API"
     app_version: str = "0.1.0"
     debug: bool = True
+    database_url: str = "postgresql://user:password@localhost:5432/geosix"
+    api_v1_prefix: str = "/api/v1"
 
     # CORS
     cors_origins: list[str] = ["http://localhost:5173"]

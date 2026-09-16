@@ -13,6 +13,13 @@ class TestHealth:
         assert data["status"] == "ok"
         assert data["service"] == "geosix-api"
 
+    def test_legacy_health_endpoint(self):
+        response = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
     def test_root_endpoint(self):
         response = client.get("/api/v1")
         assert response.status_code == 200
@@ -20,6 +27,18 @@ class TestHealth:
         assert data["service"] == "GEOSIX API"
         assert "version" in data
         assert data["docs"] == "/docs"
+
+    def test_environment_settings_read_values(self):
+        from app.core.config import Settings
+
+        settings = Settings(
+            DATABASE_URL="postgresql://user:pass@localhost:5432/geosix",
+            API_V1_PREFIX="/api/v1",
+            DEBUG="true",
+        )
+        assert settings.database_url == "postgresql://user:pass@localhost:5432/geosix"
+        assert settings.api_v1_prefix == "/api/v1"
+        assert settings.debug is True
 
 
 class TestRegistration:
