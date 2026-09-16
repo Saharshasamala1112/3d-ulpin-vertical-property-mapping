@@ -29,5 +29,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
+    # Database
+    database_url: str = (
+        "postgresql+psycopg://geosix:geosix_password@localhost:5432/geosix_dev"
+    )
+
 
 settings = Settings()
