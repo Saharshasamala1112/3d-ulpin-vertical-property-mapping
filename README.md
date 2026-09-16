@@ -2,6 +2,8 @@
 
 A Layered Vertical-Cadastre Engine for 3D ULPIN Generation & Volumetric Property Governance
 
+GEOSIX is organized as a multi-module platform for backend API services, frontend workflows, AI-powered geospatial analysis, and 3D spatial visualization. Existing application behavior is preserved while future workstreams receive dedicated repository areas.
+
 ## Getting Started
 
 ### Prerequisites
@@ -39,6 +41,15 @@ Frontend available at http://localhost:5173
 
 Copy `.env.example` to `.env` in both `backend/` and `frontend/`.
 
+### PostgreSQL / PostGIS foundation
+
+The repository includes a PostgreSQL 16 + PostGIS 3.4 foundation in [docker-compose.yml](docker-compose.yml). It exposes PostgreSQL on port 5432 and creates a persistent named volume for local development.
+
+```bash
+docker compose config
+docker compose up -d postgres
+```
+
 ## Project Structure
 
 ```
@@ -50,6 +61,8 @@ geosix/
 └── 3d-visualization/  3D rendering (future)
 ```
 
+
+The frontend retains its existing React, TypeScript, Vite, routing, authentication, and backend API integration behavior. The backend retains its FastAPI application and organized package structure.
 ## Testing
 
 ```bash
@@ -57,8 +70,13 @@ geosix/
 cd backend && pytest
 
 # Frontend
-cd frontend && npm run build
+cd frontend && npm test && npm run lint && npm run build
+
+# Backend validation
+python3 -m compileall backend/app
 ```
+
+The foundation also reserves [ai-geospatial/README.md](ai-geospatial/README.md), [3d-visualization/README.md](3d-visualization/README.md), and [docs/README.md](docs/README.md) for future workstreams and shared documentation.
 
 ## License
 
