@@ -25,11 +25,17 @@ export const ParcelsPage = () => (
 export const BuildingsPage = () => (
   <ModulePage title="Buildings" description="Building hierarchy management" icon="⬜" />
 );
+export const FloorsPage = () => (
+  <ModulePage title="Floors" description="Floor hierarchy management" icon="▤" />
+);
 export const UnitsPage = () => (
   <ModulePage title="Units" description="Floor and unit management" icon="▫" />
 );
 export const VdcPage = () => (
   <ModulePage title="VDC" description="Vertical DNA Code generation and validation" icon="⊞" />
+);
+export const TopologyPage = () => (
+  <ModulePage title="Topology" description="3D cadastral topology validation" icon="⊡" />
 );
 export const ValidationPage = () => (
   <ModulePage title="Validation" description="3D cadastral topology validation" icon="⊡" />
