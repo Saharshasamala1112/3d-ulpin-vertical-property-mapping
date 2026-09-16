@@ -13,8 +13,19 @@ from app.core.config import settings
 logger = logging.getLogger("geosix")
 
 
+def _setup_logging(debug: bool = False) -> None:
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+
+    _setup_logging(debug=settings.debug)
 
     app = FastAPI(
         title=settings.app_name,
