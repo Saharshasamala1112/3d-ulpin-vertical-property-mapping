@@ -4,11 +4,15 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import UserModel
 
 security = HTTPBearer()
+
+DatabaseSession = Annotated[Session, Depends(get_db)]
 
 
 async def get_current_user(

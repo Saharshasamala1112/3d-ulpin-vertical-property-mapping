@@ -3,14 +3,26 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.v1 import auth, health
 from app.core.config import settings
+from app.core.database import engine
 
 logger = logging.getLogger("geosix")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Verify database connectivity before accepting requests."""
+
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    yield
 
 
 def _setup_logging(debug: bool = False) -> None:
@@ -39,6 +51,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
         openapi_tags=[
             {"name": "Health", "description": "Service health and status"},
             {
