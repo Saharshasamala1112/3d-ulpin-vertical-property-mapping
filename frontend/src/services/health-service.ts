@@ -1,12 +1,8 @@
 import { apiClient } from './api-client';
-
-interface HealthResponse {
-  status: string;
-  service: string;
-}
+import type { HealthResponse } from '../types';
 
 export const healthService = {
   async check(): Promise<HealthResponse> {
-    return apiClient.get<HealthResponse>('/api/v1/health');
+    return apiClient.get<HealthResponse>('/api/health');
   },
 };

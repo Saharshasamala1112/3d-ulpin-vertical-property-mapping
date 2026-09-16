@@ -31,4 +31,9 @@ export interface ApiError {
   };
 }
 
+export interface HealthResponse {
+  status: string;
+  service: string;
+}
+
 export type Theme = 'light' | 'dark';

@@ -80,6 +80,7 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+    app.include_router(health.router, prefix="/api", tags=["Health"])
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
     @app.get("/api/v1", tags=["Root"])

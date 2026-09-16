@@ -10,6 +10,7 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 
 import { DashboardPage } from './pages/app/DashboardPage';
+import { HealthPage } from './pages/app/HealthPage';
 import {
   ParcelsPage,
   BuildingsPage,
@@ -37,6 +38,7 @@ export function App() {
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="health" element={<HealthPage />} />
               <Route path="parcels" element={<ParcelsPage />} />
               <Route path="buildings" element={<BuildingsPage />} />
               <Route path="units" element={<UnitsPage />} />
