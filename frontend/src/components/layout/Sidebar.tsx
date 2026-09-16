@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../../app/AuthContext';
-import { useTheme } from '../../app/ThemeContext';
 
 const navItems = [
   { path: '/app/dashboard', label: 'Dashboard', icon: '◻' },
