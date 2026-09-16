@@ -14,8 +14,10 @@ import { HealthPage } from './pages/app/HealthPage';
 import {
   ParcelsPage,
   BuildingsPage,
+  FloorsPage,
   UnitsPage,
   VdcPage,
+  TopologyPage,
   ValidationPage,
   OwnershipPage,
   VisualizationPage,
@@ -41,8 +43,10 @@ export function App() {
               <Route path="health" element={<HealthPage />} />
               <Route path="parcels" element={<ParcelsPage />} />
               <Route path="buildings" element={<BuildingsPage />} />
+              <Route path="floors" element={<FloorsPage />} />
               <Route path="units" element={<UnitsPage />} />
               <Route path="vdc" element={<VdcPage />} />
+              <Route path="topology" element={<TopologyPage />} />
               <Route path="validation" element={<ValidationPage />} />
               <Route path="ownership" element={<OwnershipPage />} />
               <Route path="visualization" element={<VisualizationPage />} />
