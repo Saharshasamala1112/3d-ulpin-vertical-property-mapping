@@ -1,0 +1,69 @@
+stages:
+  - test
+  - build
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NODE_ENV: "test"
+
+cache:
+  paths:
+    - .cache/pip/
+    - frontend/node_modules/
+    - frontend/package-lock.json
+
+backend:test:
+  stage: test
+  image: python:3.11-slim
+  before_script:
+    - cd backend
+    - python -m venv .venv
+    - . .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pip install pytest httpx
+  script:
+    - . .venv/bin/activate
+    - pytest -q
+  only:
+    - merge_requests
+    - main
+    - master
+    - develop
+    - epic/ownership-governance
+
+frontend:test:
+  stage: test
+  image: node:22-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm test
+    - npm run lint
+    - npm run build
+  only:
+    - merge_requests
+    - main
+    - master
+    - develop
+    - epic/ownership-governance
+
+backend:build:
+  stage: build
+  image: python:3.11-slim
+  before_script:
+    - cd backend
+    - python -m venv .venv
+    - . .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - . .venv/bin/activate
+    - python -m compileall app
+  only:
+    - merge_requests
+    - main
+    - master
+    - develop
+    - epic/ownership-governance
