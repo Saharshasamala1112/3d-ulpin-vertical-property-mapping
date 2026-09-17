@@ -61,8 +61,8 @@ def test_alembic_configuration_discovers_initial_migration():
     scripts = ScriptDirectory.from_config(config)
 
     assert scripts.dir == str(backend_dir / "alembic")
-    assert scripts.get_current_head() == "0001_enable_postgis"
-    assert Base.metadata.tables == {}
+    assert scripts.get_current_head() == "d57017b4753a"
+    assert {"parcels", "ulpins"} <= set(Base.metadata.tables)
 
 
 @pytest.mark.asyncio

@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Index, String, Text, Uuid
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship, declarative_base
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-Base = declarative_base()
+from app.core.database import Base
 
 
 class ParcelStatus(PyEnum):
@@ -49,11 +49,6 @@ class Parcel(Base):
     )
 
     ulpin_record: Mapped["ULPIN"] = relationship(back_populates="parcel", uselist=False)
-
-    __table_args__ = (
-        Index("ix_parcels_ulpin", "ulpin"),
-    )
-
 
 class ULPIN(Base):
     __tablename__ = "ulpins"

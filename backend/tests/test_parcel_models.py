@@ -1,4 +1,4 @@
-from app.models.parcel import Parcel, ParcelStatus, ULPIN
+from app.models.parcel import ULPIN, Parcel, ParcelStatus
 
 
 def test_parcel_model_contract():
