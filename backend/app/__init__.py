@@ -1,1 +1,0 @@
-"""GEOSIX backend application package."""
