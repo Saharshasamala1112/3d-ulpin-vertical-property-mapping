@@ -14,7 +14,6 @@ workflow:
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   npm_config_cache: "$CI_PROJECT_DIR/.npm"
-  NODE_ENV: "test"
 
 cache:
   key:
