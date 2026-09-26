@@ -1,5 +1,6 @@
 stages:
   - validate
+  - lint
   - test
   - build
 
@@ -25,7 +26,7 @@ cache:
     - .npm/
 
 backend:lint:
-  stage: validate
+  stage: lint
   image: python:3.11-slim
   tags:
     - 3d_docker
@@ -40,7 +41,7 @@ backend:lint:
     - ruff format --check app tests
 
 frontend:lint:
-  stage: validate
+  stage: lint
   image: node:22-alpine
   tags:
     - 3d_docker
@@ -136,10 +137,33 @@ frontend:build:
   script:
     - npm run build
 
-pipeline:check:
+ci:validate:
   stage: validate
-  image: alpine:3.21
+  image: python:3.11-slim
   tags:
     - 3d_docker
+  before_script:
+    - python -m pip install --disable-pip-version-check PyYAML
   script:
-    - test -s .gitlab-ci.yml
+    - |
+      python - <<'PY'
+      from pathlib import Path
+
+      import yaml
+
+      config = yaml.safe_load(Path(".gitlab-ci.yml").read_text())
+      stages = config["stages"]
+      if len(stages) != len(set(stages)):
+          raise SystemExit("Pipeline stages must be unique")
+
+      for name, job in config.items():
+          if name in {"stages", "workflow", "variables", "cache", "default", "include"}:
+              continue
+          if not isinstance(job, dict):
+              continue
+          stage = job.get("stage", "test")
+          if stage not in stages:
+              raise SystemExit(f"{name} uses undefined stage {stage!r}")
+          if not any(key in job for key in ("script", "trigger")):
+              raise SystemExit(f"{name} has no script or trigger")
+      PY
