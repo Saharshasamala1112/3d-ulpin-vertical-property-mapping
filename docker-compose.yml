@@ -1,0 +1,138 @@
+# =============================================================================
+# GEOSIX -- full local deployment stack (W41)
+# =============================================================================
+#   docker compose up --build        # everything: postgres + backend + frontend
+#   docker compose up -d postgres    # database only (unchanged from earlier work)
+#
+# Service naming is load bearing: `backend` and `postgres` are the hostnames the
+# containers use to reach each other. Only `postgres` is referenced from inside
+# the network; the browser-facing hostnames are the published host ports.
+#
+# Every value below is either a literal that Compose itself needs (image name,
+# mount path) or an environment interpolation with a *local* default. No secret
+# is hardcoded: the defaults for POSTGRES_PASSWORD and JWT_SECRET_KEY are the
+# repository's documented local-development values, and app/core/config.py
+# refuses to start with DEBUG=false if JWT_SECRET_KEY is still one of those.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: geosix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geosix_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-geosix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geosix_password}
+    ports:
+      # Bound to loopback: the database is reachable from the developer's machine
+      # but is not exposed on the host's network interfaces. Drop the "127.0.0.1:"
+      # prefix only if something else on the network must connect directly.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - geosix_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Unchanged from the pre-W41 database-only service.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: geosix-backend:local
+    container_name: geosix-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # Compose will not start the backend until pg_isready has passed, which
+        # removes the "database not ready yet" race on a cold volume.
+        condition: service_healthy
+    environment:
+      # Container-internal hostname is the Compose service name, never localhost:
+      # localhost inside the backend container is the backend container itself.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-geosix}:${POSTGRES_PASSWORD:-geosix_password}@postgres:5432/${POSTGRES_DB:-geosix_dev}
+      APP_NAME: ${APP_NAME:-GEOSIX API}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      # Local Compose deployment keeps the documented development secret so that
+      # `docker compose up` works with no setup. For a production deployment set
+      # DEBUG=false in .env and supply your own JWT_SECRET_KEY: Settings rejects
+      # the value above as soon as DEBUG is false.
+      DEBUG: ${DEBUG:-true}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+      # The browser-facing frontend origin, never the Docker service name.
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:8080"]}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8080}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-geosix-insecure-development-only-secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
+      PASSWORD_RESET_EXPIRE_MINUTES: ${PASSWORD_RESET_EXPIRE_MINUTES:-30}
+      # SMTP_* are the names app/core/config.py actually declares. An empty
+      # SMTP_HOST disables reset-email dispatch; the endpoint still returns its
+      # generic response.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@geosix.local}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+    ports:
+      # Loopback only. The browser reaches the API through the frontend nginx on
+      # port 8080, so publishing 8000 is purely for local debugging
+      # (http://127.0.0.1:8000/docs). See docs/deployment.md before changing it.
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      # Same stdlib probe the image's own HEALTHCHECK uses, so Compose and Docker
+      # agree on what "healthy" means.
+      test:
+        - CMD
+        - python
+        - -m
+        - app.core.healthcheck
+        - --url
+        - http://127.0.0.1:8000/api/v1/health
+        - --timeout
+        - "4"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Generous: the app's lifespan probes the database before serving.
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: geosix-frontend:local
+    container_name: geosix-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        # Only start nginx once the API is actually answering, so the first
+        # browser request cannot hit a 502.
+        condition: service_healthy
+    ports:
+      # 8080, not 5173: 5173 is the Vite dev-server port used by `npm run dev`,
+      # so binding the container there would make the two local workflows
+      # mutually exclusive. Override with FRONTEND_PORT=5173 if you prefer.
+      - "${FRONTEND_PORT:-8080}:8080"
+    healthcheck:
+      # Local nginx-only probe. Deliberately does not call /api/, so the frontend
+      # is reported healthy whenever nginx itself is serving, independently of a
+      # backend restart. Use scripts/smoke-test.sh for the end-to-end check.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  geosix_postgres_data:
+    driver: local

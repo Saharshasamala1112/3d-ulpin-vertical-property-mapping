@@ -1,0 +1,193 @@
+/* ============================================================
+   GEOSIX Design Tokens — Light & Dark Theme
+   ============================================================ */
+
+:root,
+[data-theme="light"] {
+  /* Background */
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-muted: #f5f5f5;
+  --surface-hover: #ebebeb;
+
+  /* Borders */
+  --border: #e2e2e2;
+  --border-strong: #c8c8c8;
+
+  /* Primary */
+  --primary: #1a56db;
+  --primary-hover: #1648b8;
+  --primary-foreground: #ffffff;
+
+  /* Semantic */
+  --success: #16a34a;
+  --success-bg: #f0fdf4;
+  --warning: #d97706;
+  --warning-bg: #fffbeb;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+
+  /* Muted */
+  --muted: #6b7280;
+  --muted-foreground: #9ca3af;
+
+  /* Focus */
+  --focus-ring: #1a56db;
+
+  /* Sidebar */
+  --sidebar-bg: #111827;
+  --sidebar-fg: #d1d5db;
+  --sidebar-active: #1a56db;
+  --sidebar-hover: #1f2937;
+
+  /* Input */
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --input-focus: #1a56db;
+
+  /* Badge */
+  --badge-bg: #e5e7eb;
+  --badge-fg: #374151;
+
+  /* Dialog */
+  --dialog-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #e5e5e5;
+
+  --surface: #171717;
+  --surface-muted: #1f1f1f;
+  --surface-hover: #262626;
+
+  --border: #2e2e2e;
+  --border-strong: #404040;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-foreground: #0a0a0a;
+
+  --success: #22c55e;
+  --success-bg: #052e16;
+  --warning: #f59e0b;
+  --warning-bg: #451a03;
+  --danger: #ef4444;
+  --danger-bg: #450a0a;
+
+  --muted: #9ca3af;
+  --muted-foreground: #6b7280;
+
+  --focus-ring: #3b82f6;
+
+  --sidebar-bg: #0f0f0f;
+  --sidebar-fg: #a3a3a3;
+  --sidebar-active: #3b82f6;
+  --sidebar-hover: #1a1a1a;
+
+  --input-bg: #171717;
+  --input-border: #404040;
+  --input-focus: #3b82f6;
+
+  --badge-bg: #262626;
+  --badge-fg: #d4d4d4;
+
+  --dialog-overlay: rgba(0, 0, 0, 0.7);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Global Reset & Base
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+/* Animations */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
