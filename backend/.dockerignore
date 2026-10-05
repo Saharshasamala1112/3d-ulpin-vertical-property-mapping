@@ -1,0 +1,33 @@
+# Keep the build context small and make it impossible to bake local state or
+# secrets into an image layer.
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Virtual environments / installed copies
+.venv
+venv
+env
+ENV
+*.egg-info/
+
+# Caches and coverage artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Not needed to run the API
+tests/
+scripts/
+README.md
+
+# Documentation
+.git
+.gitignore

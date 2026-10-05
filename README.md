@@ -1,93 +1,164 @@
-# 3d-ulpin-vertical-property-mapping
+# GEOSIX
 
+A Layered Vertical-Cadastre Engine for 3D ULPIN Generation & Volumetric Property Governance
 
+GEOSIX is organized as a multi-module platform for backend API services, frontend workflows, AI-powered geospatial analysis, and 3D spatial visualization. Existing application behavior is preserved while future workstreams receive dedicated repository areas.
 
-## Getting started
+## Getting Started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### Prerequisites
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Python 3.11+
+- Node.js 18+
+- npm
 
-## Add your files
+### Backend
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+uvicorn app.main:app --reload
+```
+
+API available at http://localhost:8000
+
+- Swagger: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend available at http://localhost:5173
+
+### Environment Variables
+
+Copy `.env.example` to `.env` in both `backend/` and `frontend/`.
+
+### Full stack with Docker Compose
+
+`docker compose up --build` starts the whole stack — PostGIS, the FastAPI backend, and
+an nginx-served frontend — with nothing installed but Docker. Migrate once, then open
+<http://localhost:8080>:
+
+```bash
+cp .env.example .env            # optional; the defaults work as-is
+docker compose up --build
+docker compose exec backend alembic upgrade head
+```
+
+Verify with the smoke test, which builds, starts, waits for health, and checks the
+`browser -> nginx -> backend` path:
+
+```bash
+./scripts/smoke-test.sh
+```
+
+Full deployment guidance — production configuration, CORS, secrets, migrations,
+backup/restore, upgrades, and troubleshooting — is in
+[docs/deployment.md](docs/deployment.md).
+
+### Database-only PostgreSQL / PostGIS
+
+The PostgreSQL 16 + PostGIS 3.4 service in [docker-compose.yml](docker-compose.yml)
+also works on its own. It exposes PostgreSQL on `127.0.0.1:5432` and creates a
+persistent named volume for local development. This is the usual starting point for
+the workflow above.
+
+```bash
+docker compose config
+docker compose up -d postgres
+```
+
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://code.swecha.org/saharsha1/3d-ulpin-vertical-property-mapping.git
-git branch -M main
-git push -uf origin main
+geosix/
+├── frontend/          React + TypeScript + Vite
+├── backend/           Python + FastAPI
+├── docs/              Documentation
+├── ai-geospatial/     AI/geospatial processing (future)
+└── 3d-visualization/  3D rendering (future)
 ```
 
-## Integrate with your tools
 
-* [Set up project integrations](https://code.swecha.org/saharsha1/3d-ulpin-vertical-property-mapping/-/settings/integrations)
+The frontend retains its existing React, TypeScript, Vite, routing, authentication, and backend API integration behavior. The backend retains its FastAPI application and organized package structure.
 
-## Collaborate with your team
+## Testing
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+# Backend unit tests (no database required)
+cd backend && pytest
 
-## Test and Deploy
+# Frontend
+cd frontend && npm test && npm run lint && npm run build
 
-Use the built-in continuous integration in GitLab.
+# Backend validation
+python3 -m compileall backend/app
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Integration tests (PostgreSQL + PostGIS)
 
-***
+The suite in `backend/tests/integration/` runs against a **real** PostgreSQL/PostGIS
+database. It is skipped automatically when `TEST_DATABASE_URL` is unset, so
+`pytest` still works without a local PostGIS instance. To run it, point the variable
+at a database you have migrated and are willing to have tests write to:
 
-# Editing this README
+```bash
+# 1. Start PostGIS (or use an existing instance)
+docker compose up -d postgres
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# 2. Create and migrate a dedicated test database
+createdb geosix_test
+export TEST_DATABASE_URL="postgresql+psycopg://USER:PASSWORD@localhost:5432/geosix_test"
+DATABASE_URL="$TEST_DATABASE_URL" alembic upgrade head
 
-## Suggestions for a good README
+# 3. Run everything, including the integration suite
+cd backend && pytest
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+You can also run only the integration tests:
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+cd backend && pytest tests/integration -m integration
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Notes:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+- Use a **dedicated throwaway database**. The tests deliberately exercise
+  `DELETE` cascades and archive operations.
+- Each test runs inside a transaction that is rolled back afterwards, so a run
+  leaves no rows behind and tests are order-independent.
+- Service-layer code calls `session.commit()`. The `db_session` fixture binds the
+  session to a connection-level transaction using
+  `join_transaction_mode="conditional_savepoint"`, so those commits release
+  savepoints rather than persisting data. Do **not** call `rollback()` on the
+  `db_session` fixture from a test: it deassociates the outer transaction and a
+  later write would really commit. The fixture fails loudly if this happens.
+- Bcrypt runs at `bcrypt_rounds = 12` in production; the test session lowers the
+  live cost to 4 for speed and restores it afterwards.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Coverage
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+The CI pipeline enforces a minimum of **80%** line coverage. Coverage is not
+enabled by default because it adds roughly 9 seconds per run:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+cd backend && pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The `backend:test` job runs exactly that command against a `postgis/postgis`
+service, migrates the database first, and publishes `coverage.xml` as a job
+artifact. A drop below the threshold fails the pipeline.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+The foundation also reserves [ai-geospatial/README.md](ai-geospatial/README.md), [3d-visualization/README.md](3d-visualization/README.md), and [docs/README.md](docs/README.md) for future workstreams and shared documentation.
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Proprietary — GEOSIX Project

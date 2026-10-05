@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+ENV/
+
+# Node / Vite and build output
+.vite/
+dist/
+build/
+frontend/dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Python packaging metadata
+*.egg-info/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker / local tooling
+*.log

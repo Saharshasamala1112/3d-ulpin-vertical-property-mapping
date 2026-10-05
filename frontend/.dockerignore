@@ -1,0 +1,32 @@
+# Keep the build context small and prevent local state or secrets from reaching
+# an image layer.
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Installed dependencies and prior build output: both are produced inside the
+# image, so shipping the host's copies would be wrong and much larger.
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Caches, coverage, logs
+coverage/
+*.log
+
+# Python caches from the repository-wide tooling run
+.pytest_cache/
+.ruff_cache/
+
+# NOTE: tsconfig*.json and .oxlintrc.json are deliberately NOT excluded.
+# `npm run build` runs `tsc -b`, so the TypeScript project configuration is a
+# build input. Excluding it would break the image build.
+
+# Repository metadata and docs
+.git
+.gitignore
+README.md

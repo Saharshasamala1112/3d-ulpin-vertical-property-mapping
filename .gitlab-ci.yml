@@ -15,16 +15,31 @@ workflow:
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  # Every install below is pinned to an exact version and given retries. The
+  # previous `ruff>=0.6.0` floated, so any new ruff release could change lint
+  # results without a commit; the retry flags absorb the slow/flaky registry
+  # round trips that were failing whole jobs in `before_script`.
+  PIP_INSTALL_FLAGS: "--disable-pip-version-check --no-input --retries 5 --timeout 60"
+  # Ruff is pinned to the exact version the `ruff-check`/`ruff-format`
+  # pre-commit hooks use (.pre-commit-config.yaml) so a local pre-commit run
+  # and CI agree, and to the version verified green against app/ and tests/.
+  RUFF_VERSION: "0.16.10"
+  # npm retries rather than failing the job when the registry stalls.
+  NPM_CI_FLAGS: "--fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=60000"
 
-cache:
-  key:
-    files:
-      - backend/pyproject.toml
-      - frontend/package-lock.json
-  paths:
-    - .cache/pip/
-    - .npm/
-
+# Dependency caches are declared per job instead of globally.
+#
+# The previous global key hashed BOTH backend/pyproject.toml and
+# frontend/package-lock.json and cached BOTH .cache/pip/ and .npm/, so a
+# one-line edit to either manifest invalidated every download cache for every
+# job. That is what left `backend:lint` and `frontend:lint` reinstalling their
+# tooling from scratch on merge pipelines. pip's and npm's HTTP caches are
+# content-addressed, so they stay valid across manifest changes; each job now
+# caches only its own ecosystem under a stable key.
+#
+# `policy: pull-push` matters too: the GitLab default is `pull`, so
+# merge-request pipelines only ever downloaded the cache and never populated
+# it, which kept every MR run cold by construction.
 backend:lint:
   stage: lint
   image: python:3.11-slim
@@ -33,9 +48,18 @@ backend:lint:
   rules:
     - exists:
         - backend/pyproject.toml
+  cache:
+    key: "backend-pip"
+    paths:
+      - .cache/pip/
+    policy: pull-push
   before_script:
     - cd backend
-    - python -m pip install --disable-pip-version-check -e ".[dev]"
+    # Installed directly instead of via `pip install -e ".[dev]"`: setuptools
+    # flat-layout discovery fails here with "Multiple top-level packages
+    # discovered in a flat-layout: ['app', 'alembic']". Ruff only parses the
+    # sources, so it needs neither the package nor its dependencies.
+    - python -m pip install $PIP_INSTALL_FLAGS "ruff==$RUFF_VERSION"
   script:
     - ruff check app tests
     - ruff format --check app tests
@@ -48,9 +72,14 @@ frontend:lint:
   rules:
     - exists:
         - frontend/package.json
+  cache:
+    key: "frontend-npm"
+    paths:
+      - .npm/
+    policy: pull-push
   before_script:
     - cd frontend
-    - npm ci
+    - npm ci $NPM_CI_FLAGS
   script:
     - npm run lint
 
@@ -67,12 +96,29 @@ backend:test:
     POSTGRES_DB: geosix_test
     POSTGRES_USER: geosix
     POSTGRES_PASSWORD: geosix_password
+    POSTGRES_DSN: postgresql://geosix:geosix_password@postgres:5432/geosix_test
     DATABASE_URL: "postgresql+psycopg://geosix:geosix_password@postgres:5432/geosix_test"
+    # Integration tests skip silently when this is unset, so it must be provided
+    # for the real PostGIS suite to actually run.
+    TEST_DATABASE_URL: postgresql+psycopg://geosix:geosix_password@postgres:5432/geosix_test
   tags:
     - 3d_docker
+  cache:
+    key: "backend-pip"
+    paths:
+      - .cache/pip/
+    policy: pull-push
   before_script:
     - cd backend
-    - python -m pip install --disable-pip-version-check -e ".[dev]"
+    # Not `pip install -e ".[dev]"`: setuptools flat-layout discovery fails with
+    # "Multiple top-level packages discovered in a flat-layout: ['app', 'alembic']".
+    # Install the runtime requirements directly; test tools are installed below.
+    # Test tools are kept in sync with [project.optional-dependencies].dev in
+    # pyproject.toml: pytest-asyncio is required by asyncio_mode = "auto", and
+    # pytest-cov plus coverage are required by the --cov gate in script below.
+    # httpx, used by tests/test_vdc_generator.py, comes from requirements.txt.
+    - python -m pip install $PIP_INSTALL_FLAGS -r requirements.txt
+    - python -m pip install $PIP_INSTALL_FLAGS "pytest>=8.0.0" "pytest-asyncio>=0.24.0" "pytest-cov>=5.0.0" "coverage>=7.5.0"
     - |
       python - <<'PY'
       import os
@@ -93,7 +139,16 @@ backend:test:
       PY
     - alembic upgrade head
   script:
-    - pytest -q
+    - pytest -q tests/integration/test_schema_contract.py
+    - pytest -q --cov=app --cov-report=term-missing --cov-fail-under=80
+    # `downgrade heads` rather than `downgrade -1`: the migration graph now ends
+    # in merge revisions (0006_merge_ownership_geometry and
+    # 0007_merge_rbac_and_ownership), and stepping down from a merge node by one
+    # position is ambiguous because it has two parents -- alembic fails with
+    # "Ambiguous walk". `downgrade heads` retreats those merges to their branch
+    # heads and still exercises the same downgrade/upgrade round trip.
+    - alembic downgrade heads
+    - alembic upgrade head
 
 frontend:test:
   stage: test
@@ -103,11 +158,78 @@ frontend:test:
   rules:
     - exists:
         - frontend/package.json
+  cache:
+    key: "frontend-npm"
+    paths:
+      - .npm/
+    policy: pull-push
   before_script:
     - cd frontend
-    - npm ci
+    - npm ci $NPM_CI_FLAGS
   script:
     - npm test
+
+# ---------------------------------------------------------------------------
+# W41: non-publishing image build validation.
+#
+# This job deliberately does NOT push anything to any registry. The repository
+# has no registry job, no image-push helper, and no reference to CI_REGISTRY /
+# CI_REGISTRY_IMAGE, and no runner declares registry credentials -- so a push job
+# would be guesswork that could publish to the wrong place. The deferral and the
+# conditions for lifting it are documented in docs/deployment.md ("CI and image
+# registry"), including a ready-to-adapt tag-only push job.
+#
+# What this job does buy us: the Dockerfiles are built on every pipeline, so a
+# broken Dockerfile, a bad COPY layer, or a dependency-resolution failure fails
+# CI rather than the next person's `docker compose up --build`. It runs on a
+# docker-enabled runner (tags: docker, linux) and never authenticates to anything.
+# ---------------------------------------------------------------------------
+images:build:
+  stage: build
+  image: docker:27-cli
+  tags:
+    - docker
+    - linux
+  # The docker CLI image ships no daemon, and the runner does not bind-mount the
+  # host socket, so this job needs its own. dind publishes itself to the job
+  # network under the alias `docker`, which is the hostname the CLI's entrypoint
+  # falls back to when DOCKER_HOST is unset: with DOCKER_TLS_CERTDIR empty it
+  # exports tcp://docker:2375. Without this service that host does not exist and
+  # every `docker build`/`docker run` below fails on DNS.
+  # Requires privileged mode on the runner.
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  rules:
+    - exists:
+        - backend/Dockerfile
+        - frontend/Dockerfile
+  script:
+    - docker compose config --quiet
+    # No registry login and no push: these tags stay on the runner.
+    - docker build --tag geosix-backend:ci backend
+    - docker build --tag geosix-frontend:ci frontend
+    # Prove the images are usable rather than merely buildable: the backend must
+    # refuse a development secret in production mode and accept a strong one.
+    - |
+      if docker run --rm --env DEBUG=false \
+          --env JWT_SECRET_KEY=geosix-insecure-development-only-secret \
+          geosix-backend:ci python -c "import app.core.config" 2>&1; then
+        echo "SECURITY REGRESSION: the image started with the development JWT secret"
+        exit 1
+      fi
+    - |
+      docker run --rm --env DEBUG=false \
+        --env JWT_SECRET_KEY=ciValidationOnlyNotASecret_0123456789abcdef \
+        geosix-backend:ci \
+        python -c "from app.core.config import settings; assert settings.debug is False"
+    # nginx must accept the shipped configuration and serve as a non-root user.
+    - |
+      docker run --rm --entrypoint nginx geosix-frontend:ci -t
+    - |
+      test "$(docker inspect --format '{{.Config.User}}' geosix-backend:ci)" != "root"
+      test "$(docker inspect --format '{{.Config.User}}' geosix-frontend:ci)" != "root"
 
 backend:build:
   stage: build
@@ -117,9 +239,18 @@ backend:build:
   rules:
     - exists:
         - backend/pyproject.toml
+  cache:
+    key: "backend-pip"
+    paths:
+      - .cache/pip/
+    policy: pull-push
   before_script:
     - cd backend
-    - python -m pip install --disable-pip-version-check -e .
+    # Not `pip install -e .`: setuptools flat-layout discovery fails with
+    # "Multiple top-level packages discovered in a flat-layout: ['app', 'alembic']".
+    # The project itself is not installed: compileall only parses sources, so it
+    # needs neither the package nor its import graph.
+    - python -m pip install $PIP_INSTALL_FLAGS -r requirements.txt
   script:
     - python -m compileall -q app
 
@@ -131,9 +262,14 @@ frontend:build:
   rules:
     - exists:
         - frontend/package.json
+  cache:
+    key: "frontend-npm"
+    paths:
+      - .npm/
+    policy: pull-push
   before_script:
     - cd frontend
-    - npm ci
+    - npm ci $NPM_CI_FLAGS
   script:
     - npm run build
 
@@ -143,7 +279,7 @@ ci:validate:
   tags:
     - 3d_docker
   before_script:
-    - python -m pip install --disable-pip-version-check PyYAML
+    - python -m pip install $PIP_INSTALL_FLAGS PyYAML
   script:
     - |
       python - <<'PY'
