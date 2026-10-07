@@ -4,16 +4,11 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { LoadingSpinner } from '../../components/feedback/LoadingSpinner';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
+import { Button } from '../../components/ui/Card';
 import { Card } from '../../components/ui/Card';
-import {
-  listBuildings,
-  listParcels,
-  loadBuildingScene,
-  toErrorMessage,
-} from '../../services/geometry-service';
-import type { BuildingOption, BuildingScene, ParcelOption, SceneUnit } from '../../types/geometry';
+import type { ParcelOption, BuildingOption, SceneUnit, BuildingScene } from '../../types/geometry';
 import { floorColor } from '../../components/visualization/viewer-colors';
+import { IndiaMap } from '../../components/visualization/IndiaMap';
 
 /**
  * three.js and the viewer live in a separate chunk that is only fetched once
@@ -84,7 +79,7 @@ function UnitDetails({ unit }: { unit: SceneUnit }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <h3 style={{ fontSize: '0.9375rem', fontWeight: 600 }}>{unit.unitIdentifier}</h3>
         <Badge variant="info">{unit.floor.levelName || `Floor ${unit.floor.floorNumber}`}</Badge>
-        <Badge variant={unit.status === 'active' ? 'success' : 'default'}>{unit.status}</Badge>
+        <Badge variant={unit.status === 'active' ? 'success' : 'default'}> {unit.status}</Badge>
       </div>
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.25rem 1rem', margin: 0, fontSize: '0.8125rem' }}>
         {rows.map(([label, value]) => (
@@ -110,19 +105,32 @@ export function VisualizationPage() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
 
+  // Selected parcel/building for map integration
+  const [selectedParcel, setSelectedParcel] = useState<ParcelOption | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = useState<BuildingOption | null>(null);
+
   useEffect(() => {
     let cancelled = false;
-    listParcels()
-      .then((result) => {
+    import('../../services/geometry-service')
+      .then((mod) => {
         if (cancelled) return;
-        setParcels(result);
-        if (result.length === 1) setParcelId(result[0].id);
+        mod.listParcels()
+          .then((result) => {
+            if (cancelled) return;
+            setParcels(result);
+            if (result.length === 1) setParcelId(result[0].id);
+          })
+          .catch((cause) => {
+            if (!cancelled) {
+              setStatus('error');
+              setError('Could not load parcels.');
+            }
+          });
       })
-      .catch((cause) => {
-        if (!cancelled) {
-          setStatus('error');
-          setError(toErrorMessage(cause, 'Could not load parcels.'));
-        }
+      .catch(() => {
+        if (cancelled) return;
+        setStatus('error');
+        setError('Could not load parcels.');
       });
     return () => {
       cancelled = true;
@@ -133,20 +141,32 @@ export function VisualizationPage() {
     if (!parcelId) {
       setBuildings([]);
       setBuildingId('');
+      setSelectedParcel(null);
+      setSelectedBuilding(null);
       return;
     }
     let cancelled = false;
-    setStatus('loading');
-    listBuildings(parcelId)
-      .then((result) => {
+    import('../../services/geometry-service')
+      .then((mod) => {
         if (cancelled) return;
-        setBuildings(result);
-        setStatus('idle');
+        mod.listBuildings(parcelId)
+          .then((result) => {
+            if (cancelled) return;
+            setBuildings(result);
+            setStatus('idle');
+          })
+          .catch((cause) => {
+            if (!cancelled) {
+              setStatus('error');
+              setError('Could not load buildings for this parcel.');
+            }
+          });
       })
-      .catch((cause) => {
+      .catch(() => {
         if (cancelled) return;
+        setBuildings([]);
         setStatus('error');
-        setError(toErrorMessage(cause, 'Could not load buildings for this parcel.'));
+        setError('Could not load buildings for this parcel.');
       });
     return () => {
       cancelled = true;
@@ -158,7 +178,10 @@ export function VisualizationPage() {
     setScene(null);
     setSelectedUnitId(null);
     setError('');
-  }, []);
+    // Also update the selected building state for map
+    const building = buildings.find((b) => b.id === id);
+    if (building) setSelectedBuilding(building);
+  }, [buildings]);
 
   useEffect(() => {
     if (!buildingId) {
@@ -169,18 +192,30 @@ export function VisualizationPage() {
     if (!building) return;
 
     let cancelled = false;
-    setStatus('loading');
-    loadBuildingScene(building)
-      .then((result) => {
+    import('../../services/geometry-service')
+      .then((mod) => {
         if (cancelled) return;
-        setScene(result);
-        setSelectedUnitId(result.units[0]?.id ?? null);
-        setStatus('ready');
+        mod.loadBuildingScene(building)
+          .then((result) => {
+            if (cancelled) return;
+            setScene(result);
+            // Select first unit if available
+            if (result.units.length > 0) {
+              setSelectedUnitId(result.units[0].id);
+            }
+            setStatus('ready');
+          })
+          .catch((cause) => {
+            if (!cancelled) {
+              setStatus('error');
+              setError('Could not load 3D geometry for this building.');
+            }
+          });
       })
-      .catch((cause) => {
+      .catch(() => {
         if (cancelled) return;
         setStatus('error');
-        setError(toErrorMessage(cause, 'Could not load 3D geometry for this building.'));
+        setError('Could not load 3D geometry for this building.');
       });
     return () => {
       cancelled = true;
@@ -219,8 +254,30 @@ export function VisualizationPage() {
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* India Map Section */}
         <Card padding="1rem">
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <IndiaMap
+              parcels={parcels}
+              onParcelSelect={(parcel) => {
+                setSelectedParcel(parcel);
+                setParcelId(parcel?.id ?? '');
+                setBuildings([]);
+                setBuildingId('');
+                setScene(null);
+                setSelectedUnitId(null);
+                setSelectedBuilding(null);
+              }}
+              onBuildingSelect={(building) => {
+                setSelectedBuilding(building);
+                // Find the parcel this building belongs to and select it
+                const parcel = parcels.find((p) => p.ulpin === building.identifier);
+                if (parcel) {
+                  setSelectedParcel(parcel);
+                  setParcelId(parcel.id);
+                }
+              }}
+            />
             <Select
               id="parcel-select"
               label="Parcel"
@@ -230,6 +287,9 @@ export function VisualizationPage() {
                 setParcelId(value);
                 setBuildingId('');
                 setScene(null);
+                setSelectedUnitId(null);
+                setSelectedParcel(null);
+                setSelectedBuilding(null);
               }}
               options={parcels.map((parcel) => ({ value: parcel.id, label: `${parcel.identifier} · ${parcel.ulpin}` }))}
               placeholder={parcels.length === 0 ? 'No parcels available' : 'Select a parcel'}
@@ -399,24 +459,6 @@ export function VisualizationPage() {
                       })}
                     </ul>
                   </Card>
-
-                  {scene.unitsWithoutGeometry.length > 0 && (
-                    <Card padding="1rem">
-                      <h3 style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                        Without geometry ({scene.unitsWithoutGeometry.length})
-                      </h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>
-                        These units exist but have no bounding box published yet.
-                      </p>
-                      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {scene.unitsWithoutGeometry.map((unit) => (
-                          <li key={unit.id}>
-                            <Badge>{unit.unitIdentifier}</Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    </Card>
-                  )}
                 </div>
               </div>
             )}
